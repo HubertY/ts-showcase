@@ -41,9 +41,17 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
         function resolveDeps(initialSourceFile, depth) {
             var _a, _b, _c, _d, _e;
             return __awaiter(this, void 0, void 0, function*() {
-                const depsToGet = getNewDependencies(config, moduleMap, initialSourceFile);
+                const deps = getNewDependencies(config, moduleMap, initialSourceFile);
                 // Make it so it won't get re-downloaded
-                depsToGet.forEach(dep => moduleMap.set(dep.module, { state: "loading" }));
+                deps.forEach(dep => moduleMap.set(dep.module, { state: "loading" }));
+                const depsToGet = deps.filter((dep) => {
+                    if (window.localDeps.indexOf(dep.module) !== -1) {
+                        console.log(`cancelling local dep ${dep.module}`);
+                        return false;
+                    }
+                    return true;
+                })
+
                 // Grab the module trees which gives us a list of files to download
                 const trees = yield Promise.all(depsToGet.map(f => (0, exports.getFileTreeForModuleWithTag)(config, f.module, f.version)));
                 const treesOnly = trees.filter(t => !("error" in t));
@@ -150,7 +158,6 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
         const refs = (0, exports.getReferencesForModule)(config.typescript, code).map(ref => (Object.assign(Object.assign({}, ref), { module: (0, edgeCases_1.mapModuleNameToModule)(ref.module) })));
         // Drop relative paths because we're getting all the files
         const modules = refs.filter(f => !f.module.startsWith(".")).filter(m => !moduleMap.has(m.module));
-        console.log(modules);
         return modules;
     }
     exports.getNewDependencies = getNewDependencies;

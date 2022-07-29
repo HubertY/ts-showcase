@@ -12,7 +12,7 @@ getLoaderScript.onload = () => {
     //
     require.config({
         paths: {
-            vs: "https://typescript.azureedge.net/cdn/4.0.5/monaco/min/vs",
+            vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
             // vs: 'https://unpkg.com/@typescript-deploys/monaco-editor@4.0.5/min/vs',
             //sandbox: "https://www.typescriptlang.org/js/sandbox",
             sandbox: "http://localhost:1337/lib/sandbox",

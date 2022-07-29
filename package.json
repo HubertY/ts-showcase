@@ -3,8 +3,8 @@
     "version": "0.0.1",
     "description": "showcase some typescript",
     "scripts": {
-        "build": "webpack --progress",
-        "devserv": "webpack-dev-server --open",
+        "build": "node script/indexify.js static lib static/directory.json && webpack --progress",
+        "devserv": "node script/indexify.js static lib static/directory.json && webpack-dev-server --open",
         "serv": "node server.js"
     },
     "author": "Hubert Yuan",

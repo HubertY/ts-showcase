@@ -1,12 +1,27 @@
+import { massFetch } from "./traverse"
+
 type Monaco = typeof import("monaco-editor");
-import * as fact from "@typescript/sandbox"
+type sbox = typeof import("@typescript/sandbox");
 
-declare const window: { main: Monaco, sandboxFactory: typeof fact, ts: any, mainFn: any, [key: string]: any };
+declare global {
+    interface Window { main: Monaco, sandboxFactory: sbox, ts: any, mainFn: any, [key: string]: any }
+}
 
+const initialCode = `import * as script from "ts-script";
 
-window.mainFn = function () {
-    const initialCode = `console.log("Hello world!");
+const eng = new script.ScriptingEngine();
+const myScript = eng.createScript("myScript",[eng.Time],
+async (ctx)=>{
+    for(let i = 0; i < 100; i++){
+        await ctx.Time.waitUntil(i*100);
+        console.log("yay");
+    }
+})
+eng.run(myScript,eng.createContext());
 `
+window.localDeps = ["ts-script"];
+
+window.mainFn = async function () {
     const isOK = window.main && window.ts && window.sandboxFactory
     if (isOK) {
         document.getElementById("loader").parentNode.removeChild(document.getElementById("loader"))
@@ -23,13 +38,29 @@ window.mainFn = function () {
         domID: "monaco-editor-embed",
     }
 
+
     const sandbox = window.sandboxFactory.createTypeScriptSandbox(sandboxConfig, window.main, window.ts)
+
+    const localLibs = new Map<string, string>();
+    const localScripts = new Map<string, string>();
+    await massFetch("./directory.json",
+        (s) => s.endsWith(".ts") || s.endsWith("package.json") || s.endsWith(".js"),
+        (s, data) => {
+            if (s.endsWith(".js")) {
+                localScripts.set(s, data);
+            }
+            else {
+                localLibs.set(s, data);
+            }
+        });
+    for (const [s, data] of localLibs) {
+        sandbox.addLibraryToRuntime(data, s.replace("lib", "/node_modules"));
+    }
+
+
     sandbox.editor.focus()
-    console.log("lessgo");
-    sandbox.addLibraryToRuntime("export const x = 5;", "environment");
 
     document.getElementById("run").addEventListener("click", (ev) => {
-        console.log("yo");
         sandbox.getRunnableJS().then((s) => {
             console.log(s);
             eval(s);
@@ -38,3 +69,4 @@ window.mainFn = function () {
         });
     })
 }
+export { };
