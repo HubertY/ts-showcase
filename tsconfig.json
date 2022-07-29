@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"module": "commonjs",
+		"target": "es2015",
+		"allowJs": true,
+		"outDir": "build/",
+		"declaration": true
+	},
+	"include": [
+		"src/**/*",
+	]
+}
