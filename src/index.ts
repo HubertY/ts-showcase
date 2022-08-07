@@ -21,16 +21,20 @@ async (ctx)=>{
 eng.run(myScript,eng.createContext());
 `
 
+const _runtimes = [] as { el: HTMLScriptElement, resolve: () => void }[];
+window._runtimes = _runtimes;
 function executeJS(code: string) {
-    return new Promise(resolve => {
-        if (!window.resolveHooks) {
-            window.resolveHooks = [];
-        }
-        const i = window.resolveHooks.length;
-        window.resolveHooks.push(resolve);
+    return new Promise<void>(resolve => {
+        const i = window._runtimes.length;
         const el = document.createElement("script");
-        el.innerHTML = code + `\nwindow.resolveHooks[${i}]();`;
         el.type = "module";
+        el.className = "runtime";
+        el.innerHTML = code + `
+window._runtimes[${i}].el.parentNode.removeChild(window._runtimes[${i}].el);
+window._runtimes[${i}].resolve();
+window._runtimes[${i}] = {};
+`
+        window._runtimes.push({ el, resolve });
         document.body.appendChild(el);
     });
 }
@@ -64,7 +68,6 @@ async function main() {
     await massFetch(files.filter((s) => s.endsWith("package.json")), (path, data) => {
         localLibs.set(path, data);
         const pack = JSON.parse(data);
-        console.log(pack);
         if (localDeps.includes(pack.name)) {
             localScripts.set(pack.name, `./${path.replace("package.json", pack.main)}`);
         }
@@ -80,7 +83,6 @@ async function main() {
             console.log(err);
         });
         if (code) {
-            console.log(localScripts);
             for (const [name, path] of localScripts) {
                 code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
                 code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
