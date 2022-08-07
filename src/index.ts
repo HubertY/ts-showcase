@@ -5,7 +5,7 @@ type Monaco = typeof import("monaco-editor");
 type Sandbox = typeof import("@typescript/sandbox");
 
 declare global {
-    interface Window { mainFn: any, require: any, [key: string]: any }
+    interface Window { require: any, [key: string]: any }
 }
 
 const initialCode = `import * as script from "ts-script";
@@ -40,7 +40,6 @@ window._runtimes[${i}] = {};
 }
 
 const localDeps = ["ts-script"];
-window.localDeps = localDeps;
 const localLibs = new Map<string, string>();
 const localScripts = new Map<string, string>();
 
@@ -54,6 +53,7 @@ async function main() {
 
         },
         domID: "monaco-editor-embed",
+        libIgnore: localDeps
     }
 
 

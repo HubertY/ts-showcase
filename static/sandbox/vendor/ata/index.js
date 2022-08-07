@@ -22,7 +22,7 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
      * basically exported for tests and should be considered
      * implementation details by consumers.
      */
-    const setupTypeAcquisition = (config) => {
+    const setupTypeAcquisition = (config, libIgnore = []) => {
         const moduleMap = new Map();
         const fsMap = new Map();
         let estimatedToDownload = 0;
@@ -30,7 +30,7 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
         return (initialSourceFile) => {
             estimatedToDownload = 0;
             estimatedDownloaded = 0;
-            resolveDeps(initialSourceFile, 0).then(t => {
+            resolveDeps(initialSourceFile, 0, libIgnore).then(t => {
                 var _a, _b;
                 if (estimatedDownloaded > 0) {
                     (_b = (_a = config.delegate).finished) === null || _b === void 0 ? void 0 : _b.call(_a, fsMap);
@@ -38,14 +38,14 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
             });
         };
 
-        function resolveDeps(initialSourceFile, depth) {
+        function resolveDeps(initialSourceFile, depth, libIgnore = []) {
             var _a, _b, _c, _d, _e;
             return __awaiter(this, void 0, void 0, function*() {
                 const deps = getNewDependencies(config, moduleMap, initialSourceFile);
                 // Make it so it won't get re-downloaded
                 deps.forEach(dep => moduleMap.set(dep.module, { state: "loading" }));
                 const depsToGet = deps.filter((dep) => {
-                    if (window.localDeps.indexOf(dep.module) !== -1) {
+                    if (libIgnore.indexOf(dep.module) !== -1) {
                         console.log(`cancelling local dep ${dep.module}`);
                         return false;
                     }
@@ -101,7 +101,7 @@ define(["require", "exports", "./apis", "./edgeCases"], function(require, export
                             config.delegate.progress(estimatedDownloaded, estimatedToDownload);
                         }
                         // Recurse through deps
-                        yield resolveDeps(dtsCode, depth + 1);
+                        yield resolveDeps(dtsCode, depth + 1, libIgnore);
                     }
                 })));
             });

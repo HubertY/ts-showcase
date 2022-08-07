@@ -182,7 +182,7 @@ define(["require", "exports", "./theme", "./compilerOptions", "./vendor/lzstring
                     console.log("ATA done");
                 },
             },
-        });
+        }, partialConfig.libIgnore);
         const textUpdated = () => {
             const code = editor.getModel().getValue();
             if (config.supportTwoslashCompilerOptions) {
