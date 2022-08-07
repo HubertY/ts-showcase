@@ -1,4 +1,3 @@
-"use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -8,8 +7,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ScriptingEngine = void 0;
 class ContextComponent {
     constructor(name, makeContext) {
         this.name = name;
@@ -38,7 +35,6 @@ class TimeComponent {
     }
     waitUntil(t) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("waituntil", t);
             const prom = makeResolvable();
             this.engine.scheduleWake(t);
             this.engine.yieldFromCurrentExecution((s) => s.timestamp >= t, prom);
@@ -131,7 +127,7 @@ class ScriptingEngine {
         const instance = new ScriptInstance(script, ctx, ...args);
         this.scriptInstances.add(instance);
         this.flags.set(instance, () => true);
-        instance.finished.then(() => { console.log("a script finished"); this.signalCurrentExecutionDone(); });
+        instance.finished.then(() => { this.signalCurrentExecutionDone(); });
         return instance;
     }
     signalCurrentExecutionDone() {
@@ -154,7 +150,6 @@ class ScriptingEngine {
             for (const script of this.scriptInstances) {
                 const flag = this.flags.get(script);
                 if (flag && flag(this)) {
-                    console.log("its time");
                     this.currentlyExecuting = script;
                     this.flags.delete(script);
                     this.currentlyExecuting.wake.resolve();
@@ -172,11 +167,10 @@ class ScriptingEngine {
                 ;
             while (this.wakeTimes.length && this.wakeTimes[this.wakeTimes.length - 1] <= t) {
                 this.timestamp = this.wakeTimes.pop();
-                console.log(this.timestamp);
                 while (yield this.tick())
                     ;
             }
         });
     }
 }
-exports.ScriptingEngine = ScriptingEngine;
+export { ScriptingEngine };

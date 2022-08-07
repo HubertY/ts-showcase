@@ -15,7 +15,7 @@ getLoaderScript.onload = () => {
             vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
             // vs: 'https://unpkg.com/@typescript-deploys/monaco-editor@4.0.5/min/vs',
             //sandbox: "https://www.typescriptlang.org/js/sandbox",
-            sandbox: "http://localhost:1337/lib/sandbox",
+            sandbox: "./sandbox",
         },
         // This is something you need for monaco to work
         ignoreDuplicateModules: ["vs/editor/editor.main"],
@@ -27,7 +27,6 @@ getLoaderScript.onload = () => {
         _tsWorker,
         sandboxFactory
     ) => {
-        console.log("yay");
         window.main = main;
         window.sandboxFactory = sandboxFactory;
         mainFn();

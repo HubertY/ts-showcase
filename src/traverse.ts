@@ -1,8 +1,8 @@
-export async function massFetch(directory: string, filter: (s: string) => boolean, callback: (path: string, data: string) => void) {
-    // http://localhost:8080
-    const dir = await (await fetch(directory)).json();
-    console.log(dir);
-    const paths: Array<string> = dir.paths.filter(filter);
+export async function directory(url: string) {
+    return (await (await fetch(url)).json()).paths as string[];
+}
+
+export async function massFetch(paths: string[], callback: (path: string, data: string) => void) {
     for (const path of paths) {
         const data = await (await fetch(path)).text();
         callback(path, data);
