@@ -2,10 +2,10 @@ import { directory, massFetch } from "./traverse"
 
 
 type Monaco = typeof import("monaco-editor");
-type sbox = typeof import("@typescript/sandbox");
+type Sandbox = typeof import("@typescript/sandbox");
 
 declare global {
-    interface Window { main: Monaco, sandboxFactory: sbox, ts: any, mainFn: any, [key: string]: any }
+    interface Window { mainFn: any, require: any, [key: string]: any }
 }
 
 const initialCode = `import * as script from "ts-script";
@@ -40,15 +40,8 @@ window.localDeps = localDeps;
 const localLibs = new Map<string, string>();
 const localScripts = new Map<string, string>();
 
-window.mainFn = async function () {
-    const isOK = window.main && window.ts && window.sandboxFactory
-    if (isOK) {
-        document.getElementById("loader").parentNode.removeChild(document.getElementById("loader"))
-    } else {
-        console.error("Could not get all the dependencies of sandbox set up!")
-        console.error("main", !!window.main, "ts", !!window.ts, "sandbox", !!window.sandboxFactory)
-        return
-    }
+async function main() {
+    const stuff = await init();
 
     // Create a sandbox and embed it into the the div #monaco-editor-embed
     const sandboxConfig = {
@@ -60,7 +53,7 @@ window.mainFn = async function () {
     }
 
 
-    const sandbox = window.sandboxFactory.createTypeScriptSandbox(sandboxConfig, window.main, window.ts)
+    const sandbox = stuff.sandbox.createTypeScriptSandbox(sandboxConfig, stuff.editor, window.ts);
 
     const files = await directory("./directory.json");
 
@@ -71,6 +64,7 @@ window.mainFn = async function () {
     await massFetch(files.filter((s) => s.endsWith("package.json")), (path, data) => {
         localLibs.set(path, data);
         const pack = JSON.parse(data);
+        console.log(pack);
         if (localDeps.includes(pack.name)) {
             localScripts.set(pack.name, `./${path.replace("package.json", pack.main)}`);
         }
@@ -86,6 +80,7 @@ window.mainFn = async function () {
             console.log(err);
         });
         if (code) {
+            console.log(localScripts);
             for (const [name, path] of localScripts) {
                 code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
                 code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
@@ -94,4 +89,46 @@ window.mainFn = async function () {
         }
     })
 }
-export { };
+main();
+
+export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
+    return new Promise((resolve, reject) => {
+        // First set up the VSCode loader in a script tag
+        const getLoaderScript = document.createElement("script")
+        getLoaderScript.src = "https://www.typescriptlang.org/js/vs.loader.js"
+        getLoaderScript.async = true
+        getLoaderScript.onload = () => {
+            // Now the loader is ready, tell require where it can get the version of monaco, and the sandbox
+            // This version uses the latest version of the sandbox, which is used on the TypeScript website
+
+            // For the monaco version you can use unpkg or the TypeScript web infra CDN
+            // You can see the available releases for TypeScript here:
+            // https://typescript.azureedge.net/indexes/releases.json
+            //
+            window.require.config({
+                paths: {
+                    vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
+                    sandbox: "./sandbox",
+                },
+                // This is something you need for monaco to work
+                ignoreDuplicateModules: ["vs/editor/editor.main"],
+            })
+
+            // Grab a copy of monaco, TypeScript and the sandbox
+            window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker", "sandbox/index"], (
+                editor: Monaco,
+                _tsWorker: any,
+                sandbox: Sandbox
+            ) => {
+                document.getElementById("loader").parentNode.removeChild(document.getElementById("loader"))
+                if (editor && _tsWorker && sandbox) {
+                    resolve({ editor, sandbox });
+                }
+                else {
+                    reject({ editor: !!editor, _tsWorker: !!_tsWorker, sandbox: !!sandbox });
+                }
+            })
+        }
+        document.body.appendChild(getLoaderScript)
+    });
+}
