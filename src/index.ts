@@ -1,15 +1,16 @@
 import { directory, massFetch } from "./traverse"
 
-
 type Monaco = typeof import("monaco-editor");
-type Sandbox = typeof import("@typescript/sandbox");
+type SandboxLib = typeof import("./sandbox");
+
+export type ShowcaseInitialization = { editor: Monaco, sandbox: SandboxLib };
 
 declare global {
     interface Window { require: any, [key: string]: any }
 }
 
 class Showcase {
-    sandbox: ReturnType<Sandbox["createTypeScriptSandbox"]>;
+    sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]>;
     localScripts: Map<string, string>;
     async run() {
         let code = await this.sandbox.getRunnableJS().catch((err) => {
@@ -20,13 +21,16 @@ class Showcase {
                 code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
                 code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
             }
-            executeJS(code);
+            return executeJS(code);
         }
     }
     focus() {
         this.sandbox.editor.focus()
     }
-    constructor(sandbox: ReturnType<Sandbox["createTypeScriptSandbox"]>, localScripts: Map<string, string> = new Map()) {
+    get editor(): import("monaco-editor").editor.IStandaloneCodeEditor {
+        return this.sandbox.editor;
+    }
+    constructor(sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]>, localScripts: Map<string, string> = new Map()) {
         this.sandbox = sandbox;
         this.localScripts = localScripts;
     }
@@ -51,7 +55,7 @@ window._runtimes[${i}] = {};
 }
 
 
-export async function makeShowcase(inits: { editor: Monaco, sandbox: Sandbox }, domID: string, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
+export async function makeShowcase(inits: ShowcaseInitialization, domID: string, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
     const localLibs = new Map<string, string>();
     const localScripts = new Map<string, string>();
 
@@ -59,7 +63,7 @@ export async function makeShowcase(inits: { editor: Monaco, sandbox: Sandbox }, 
     const sandboxConfig = {
         text: initialCode,
         compilerOptions: {},
-        domID: "monaco-editor-embed",
+        domID,
         libIgnore: localDeps
     }
 
@@ -74,7 +78,7 @@ export async function makeShowcase(inits: { editor: Monaco, sandbox: Sandbox }, 
     await massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
         localLibs.set(path, data);
         const pack = JSON.parse(data);
-        if (localDeps.includes(pack.name)) {
+        if (localDeps.indexOf(pack.name) !== -1) {
             localScripts.set(pack.name, `./${libDir}/${path.replace("package.json", pack.main)}`);
         }
     });
@@ -87,8 +91,9 @@ export async function makeShowcase(inits: { editor: Monaco, sandbox: Sandbox }, 
     return new Showcase(sandbox, localScripts);
 }
 
-export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
+export function init(sandboxPath: string): Promise<ShowcaseInitialization> {
     return new Promise((resolve, reject) => {
+        console.log("initializing showcase...");
         // First set up the VSCode loader in a script tag
         const getLoaderScript = document.createElement("script")
         getLoaderScript.src = "https://www.typescriptlang.org/js/vs.loader.js"
@@ -104,7 +109,7 @@ export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
             window.require.config({
                 paths: {
                     vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
-                    sandbox: "./static/sandbox",
+                    sandbox: sandboxPath,
                 },
                 // This is something you need for monaco to work
                 ignoreDuplicateModules: ["vs/editor/editor.main"],
@@ -114,13 +119,14 @@ export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
             window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker", "sandbox/index"], (
                 editor: Monaco,
                 _tsWorker: any,
-                sandbox: Sandbox
+                sandbox: SandboxLib
             ) => {
-                document.getElementById("loader").parentNode.removeChild(document.getElementById("loader"))
                 if (editor && _tsWorker && sandbox) {
-                    resolve({ editor, sandbox });
+                    console.log("showcase initialized");
+                    resolve({ editor, sandbox: sandbox });
                 }
                 else {
+                    console.log("showcase initialize error");
                     reject({ editor: !!editor, _tsWorker: !!_tsWorker, sandbox: !!sandbox });
                 }
             })
@@ -128,28 +134,3 @@ export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
         document.body.appendChild(getLoaderScript)
     });
 }
-
-const initialCode = `import * as script from "ts-script";
-
-const eng = new script.ScriptingEngine();
-const myScript = eng.createScript("myScript",[eng.Time],
-async (ctx)=>{
-    for(let i = 0; i < 100; i++){
-        await ctx.Time.waitUntil(i*100);
-        console.log("yay");
-    }
-})
-eng.run(myScript,eng.createContext());
-`
-async function main() {
-    const inits = await init();
-
-    const showcase = await makeShowcase(inits, "monaco-editor-embed", ["ts-script"], "static/lib", initialCode);
-
-
-    document.getElementById("run").addEventListener("click", () => {
-        showcase.run();
-    })
-}
-
-main()
