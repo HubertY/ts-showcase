@@ -15,18 +15,18 @@ async function* walk(dir, prefix = '') {
 }
 
 // Then, use it with a simple async for loop
-async function main(prefix, inpath, outpath) {
+async function main(prefix, inpath) {
     const out = { paths: [] };
     for await (const p of walk(inpath, prefix)) {
         const pp = p.replace(/\\/g, '/');
         out.paths.push(pp);
     }
     const s = JSON.stringify(out);
-    await new Promise((resolve) => fs.writeFile(outpath, s, resolve));
+    await new Promise((resolve) => fs.writeFile(`${prefix}/directory.json`, s, resolve));
 }
 const argv = process.argv;
-if (argv.length !== 5) {
-    throw RangeError("needs three arguments");
+if (argv.length !== 3) {
+    throw RangeError("needs one arguments");
 } else {
-    main(argv[2], argv[3], argv[4]);
+    main(argv[2], "");
 }

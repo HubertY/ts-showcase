@@ -8,18 +8,29 @@ declare global {
     interface Window { require: any, [key: string]: any }
 }
 
-const initialCode = `import * as script from "ts-script";
-
-const eng = new script.ScriptingEngine();
-const myScript = eng.createScript("myScript",[eng.Time],
-async (ctx)=>{
-    for(let i = 0; i < 100; i++){
-        await ctx.Time.waitUntil(i*100);
-        console.log("yay");
+class Showcase {
+    sandbox: ReturnType<Sandbox["createTypeScriptSandbox"]>;
+    localScripts: Map<string, string>;
+    async run() {
+        let code = await this.sandbox.getRunnableJS().catch((err) => {
+            console.log(err);
+        });
+        if (code) {
+            for (const [name, path] of this.localScripts) {
+                code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
+                code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
+            }
+            executeJS(code);
+        }
     }
-})
-eng.run(myScript,eng.createContext());
-`
+    focus() {
+        this.sandbox.editor.focus()
+    }
+    constructor(sandbox: ReturnType<Sandbox["createTypeScriptSandbox"]>, localScripts: Map<string, string> = new Map()) {
+        this.sandbox = sandbox;
+        this.localScripts = localScripts;
+    }
+}
 
 const _runtimes = [] as { el: HTMLScriptElement, resolve: () => void }[];
 window._runtimes = _runtimes;
@@ -39,59 +50,42 @@ window._runtimes[${i}] = {};
     });
 }
 
-const localDeps = ["ts-script"];
-const localLibs = new Map<string, string>();
-const localScripts = new Map<string, string>();
 
-async function main() {
-    const stuff = await init();
+export async function makeShowcase(inits: { editor: Monaco, sandbox: Sandbox }, domID: string, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
+    const localLibs = new Map<string, string>();
+    const localScripts = new Map<string, string>();
 
     // Create a sandbox and embed it into the the div #monaco-editor-embed
     const sandboxConfig = {
         text: initialCode,
-        compilerOptions: {
-
-        },
+        compilerOptions: {},
         domID: "monaco-editor-embed",
         libIgnore: localDeps
     }
 
+    const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
 
-    const sandbox = stuff.sandbox.createTypeScriptSandbox(sandboxConfig, stuff.editor, window.ts);
+    const files = await directory(`${libDir}/directory.json`);
 
-    const files = await directory("./directory.json");
-
-    await massFetch(files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
+    await massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
         localLibs.set(path, data);
     });
 
-    await massFetch(files.filter((s) => s.endsWith("package.json")), (path, data) => {
+    await massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
         localLibs.set(path, data);
         const pack = JSON.parse(data);
         if (localDeps.includes(pack.name)) {
-            localScripts.set(pack.name, `./${path.replace("package.json", pack.main)}`);
+            localScripts.set(pack.name, `./${libDir}/${path.replace("package.json", pack.main)}`);
         }
     });
 
     for (const [s, data] of localLibs) {
-        sandbox.addLibraryToRuntime(data, s.replace("lib", "/node_modules"));
+        console.log(`/node_modules/${s}`)
+        sandbox.addLibraryToRuntime(data, `/node_modules/${s}`);
     }
-    sandbox.editor.focus()
 
-    document.getElementById("run").addEventListener("click", async (ev) => {
-        let code = await sandbox.getRunnableJS().catch((err) => {
-            console.log(err);
-        });
-        if (code) {
-            for (const [name, path] of localScripts) {
-                code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
-                code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
-            }
-            executeJS(code);
-        }
-    })
+    return new Showcase(sandbox, localScripts);
 }
-main();
 
 export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
     return new Promise((resolve, reject) => {
@@ -110,7 +104,7 @@ export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
             window.require.config({
                 paths: {
                     vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
-                    sandbox: "./sandbox",
+                    sandbox: "./static/sandbox",
                 },
                 // This is something you need for monaco to work
                 ignoreDuplicateModules: ["vs/editor/editor.main"],
@@ -134,3 +128,28 @@ export function init(): Promise<{ editor: Monaco, sandbox: Sandbox }> {
         document.body.appendChild(getLoaderScript)
     });
 }
+
+const initialCode = `import * as script from "ts-script";
+
+const eng = new script.ScriptingEngine();
+const myScript = eng.createScript("myScript",[eng.Time],
+async (ctx)=>{
+    for(let i = 0; i < 100; i++){
+        await ctx.Time.waitUntil(i*100);
+        console.log("yay");
+    }
+})
+eng.run(myScript,eng.createContext());
+`
+async function main() {
+    const inits = await init();
+
+    const showcase = await makeShowcase(inits, "monaco-editor-embed", ["ts-script"], "static/lib", initialCode);
+
+
+    document.getElementById("run").addEventListener("click", () => {
+        showcase.run();
+    })
+}
+
+main()

@@ -27,6 +27,7 @@ module.exports = {
         new CopyWebpackPlugin({
             patterns: [{
                     from: 'static',
+                    to: 'static',
                     info: { minimized: true },
                 }
 
