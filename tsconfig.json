@@ -5,6 +5,7 @@
 		"outDir": "dist/",
 		"declaration": true,
 		"moduleResolution": "node",
+		"strict": true
 	},
 	"include": [
 		"src/**/*",
