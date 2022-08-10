@@ -9,10 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { directory, massFetch } from "./traverse";
 export class Showcase {
-    constructor(domID, localDeps = [], libDir = ".", initialCode = "") {
+    constructor(domEle, localDeps = [], libDir = ".", initialCode = "") {
         this.destroyed = false;
         this.localScripts = new Map();
-        this.initialize(domID, localDeps, libDir, initialCode);
+        this.initialize(domEle, localDeps, libDir, initialCode);
     }
     run() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -25,10 +25,13 @@ export class Showcase {
                         code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
                         code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
                     }
-                    return executeJS(code);
+                    return executeJS(code, this.scriptDoc);
                 }
             }
         });
+    }
+    target(doc) {
+        this.scriptDoc = doc;
     }
     destroy() {
         if (this.sandbox) {
@@ -46,7 +49,7 @@ export class Showcase {
         var _a;
         return (_a = this.sandbox) === null || _a === void 0 ? void 0 : _a.editor;
     }
-    initialize(domID, localDeps = [], libDir = ".", initialCode = "") {
+    initialize(domEle, localDeps = [], libDir = ".", initialCode = "") {
         return __awaiter(this, void 0, void 0, function* () {
             if (libDir === "/") {
                 libDir = "";
@@ -80,7 +83,7 @@ export class Showcase {
             const sandboxConfig = {
                 text: initialCode,
                 compilerOptions: {},
-                domID,
+                domEle,
                 libIgnore: localDeps
             };
             const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
@@ -95,10 +98,10 @@ export class Showcase {
 }
 const _runtimes = [];
 window._runtimes = _runtimes;
-function executeJS(code) {
+function executeJS(code, doc = document) {
     return new Promise(resolve => {
         const i = window._runtimes.length;
-        const el = document.createElement("script");
+        const el = doc.createElement("script");
         el.type = "module";
         el.className = "runtime";
         el.innerHTML = code + `
@@ -107,7 +110,7 @@ window._runtimes[${i}].resolve();
 window._runtimes[${i}] = {};
 `;
         window._runtimes.push({ el, resolve });
-        document.body.appendChild(el);
+        doc.body.appendChild(el);
     });
 }
 function makeResolvable() {

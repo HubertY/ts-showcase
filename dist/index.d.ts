@@ -14,12 +14,14 @@ export declare class Showcase {
     sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]> | undefined;
     localScripts: Map<string, string>;
     destroyed: boolean;
+    scriptDoc: Document | undefined;
     run(): Promise<void>;
+    target(doc: Document): void;
     destroy(): void;
     focus(): void;
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined;
     private initialize;
-    constructor(domID: string, localDeps?: string[], libDir?: string, initialCode?: string);
+    constructor(domEle: HTMLElement, localDeps?: string[], libDir?: string, initialCode?: string);
 }
 export declare function init(sandboxPath: string): Promise<ShowcaseInitialization>;
 export {};

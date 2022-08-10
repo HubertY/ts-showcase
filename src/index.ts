@@ -13,6 +13,7 @@ export class Showcase {
     sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]> | undefined;
     localScripts: Map<string, string>;
     destroyed: boolean;
+    scriptDoc: Document | undefined;
     async run() {
         if (this.sandbox) {
             let code = await this.sandbox.getRunnableJS().catch((err) => {
@@ -23,9 +24,12 @@ export class Showcase {
                     code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
                     code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
                 }
-                return executeJS(code);
+                return executeJS(code, this.scriptDoc);
             }
         }
+    }
+    target(doc: Document) {
+        this.scriptDoc = doc;
     }
     destroy() {
         if (this.sandbox) {
@@ -42,7 +46,7 @@ export class Showcase {
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined {
         return this.sandbox?.editor;
     }
-    private async initialize(domID: string, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
+    private async initialize(domEle: HTMLElement, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
         if (libDir === "/") {
             libDir = "";
         }
@@ -77,7 +81,7 @@ export class Showcase {
         const sandboxConfig = {
             text: initialCode,
             compilerOptions: {},
-            domID,
+            domEle,
             libIgnore: localDeps
         }
         const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
@@ -88,19 +92,19 @@ export class Showcase {
         this.sandbox = sandbox;
         this.localScripts = localScripts;
     }
-    constructor(domID: string, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
+    constructor(domEle: HTMLElement, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
         this.destroyed = false;
         this.localScripts = new Map();
-        this.initialize(domID, localDeps, libDir, initialCode);
+        this.initialize(domEle, localDeps, libDir, initialCode);
     }
 }
 
 const _runtimes = [] as { el: HTMLScriptElement, resolve: () => void }[];
 window._runtimes = _runtimes;
-function executeJS(code: string) {
+function executeJS(code: string, doc: Document = document) {
     return new Promise<void>(resolve => {
         const i = window._runtimes.length;
-        const el = document.createElement("script");
+        const el = doc.createElement("script");
         el.type = "module";
         el.className = "runtime";
         el.innerHTML = code + `
@@ -109,7 +113,7 @@ window._runtimes[${i}].resolve();
 window._runtimes[${i}] = {};
 `
         window._runtimes.push({ el, resolve });
-        document.body.appendChild(el);
+        doc.body.appendChild(el);
     });
 }
 
