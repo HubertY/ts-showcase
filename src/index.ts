@@ -99,22 +99,12 @@ export class Showcase {
     }
 }
 
-const _runtimes = [] as { el: HTMLScriptElement, resolve: () => void }[];
-window._runtimes = _runtimes;
 function executeJS(code: string, doc: Document = document) {
-    return new Promise<void>(resolve => {
-        const i = window._runtimes.length;
-        const el = doc.createElement("script");
-        el.type = "module";
-        el.className = "runtime";
-        el.innerHTML = code + `
-window._runtimes[${i}].el.parentNode.removeChild(window._runtimes[${i}].el);
-window._runtimes[${i}].resolve();
-window._runtimes[${i}] = {};
-`
-        window._runtimes.push({ el, resolve });
-        doc.body.appendChild(el);
-    });
+    const el = doc.createElement("script");
+    el.type = "module";
+    el.className = "runtime";
+    el.innerHTML = code;
+    doc.body.appendChild(el);
 }
 
 interface Resolvable<T> extends Promise<T> {
