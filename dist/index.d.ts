@@ -1,3 +1,4 @@
+declare type CompilerOptions = import("monaco-editor").languages.typescript.CompilerOptions;
 declare type Monaco = typeof import("monaco-editor");
 declare type SandboxLib = typeof import("./sandbox");
 declare type ShowcaseInitialization = {
@@ -10,6 +11,14 @@ declare global {
         [key: string]: any;
     }
 }
+export interface ShowcaseOptions {
+    compilerOptions?: CompilerOptions;
+    local?: {
+        localDeps: string[];
+        libDir: string;
+    };
+    initialCode?: string;
+}
 export declare class Showcase {
     sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]> | undefined;
     localScripts: Map<string, string>;
@@ -21,7 +30,7 @@ export declare class Showcase {
     focus(): void;
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined;
     private initialize;
-    constructor(domEle: HTMLElement, localDeps?: string[], libDir?: string, initialCode?: string);
+    constructor(domEle: HTMLElement, opts?: ShowcaseOptions);
 }
 export declare function init(sandboxPath: string): Promise<ShowcaseInitialization>;
 export {};

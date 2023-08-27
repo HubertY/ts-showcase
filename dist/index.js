@@ -9,10 +9,10 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 import { directory, massFetch } from "./traverse";
 export class Showcase {
-    constructor(domEle, localDeps = [], libDir = ".", initialCode = "") {
+    constructor(domEle, opts = {}) {
         this.destroyed = false;
         this.localScripts = new Map();
-        this.initialize(domEle, localDeps, libDir, initialCode);
+        this.initialize(domEle, opts);
     }
     run() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -49,42 +49,42 @@ export class Showcase {
         var _a;
         return (_a = this.sandbox) === null || _a === void 0 ? void 0 : _a.editor;
     }
-    initialize(domEle, localDeps = [], libDir = ".", initialCode = "") {
+    initialize(domEle, opts) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (libDir === "/") {
-                libDir = "";
-            }
             const localScripts = new Map();
             const localLibs = new Map();
             const inits = yield initialization;
             if (this.destroyed) {
                 return;
             }
-            const files = yield directory(`${libDir}/directory.json`);
-            if (this.destroyed) {
-                return;
-            }
-            yield massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
-                localLibs.set(path, data);
-            });
-            if (this.destroyed) {
-                return;
-            }
-            yield massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
-                localLibs.set(path, data);
-                const pack = JSON.parse(data);
-                if (localDeps.indexOf(pack.name) !== -1) {
-                    localScripts.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
+            if (opts.local) {
+                const { libDir, localDeps } = opts.local;
+                const files = yield directory(`${libDir}/directory.json`);
+                if (this.destroyed) {
+                    return;
                 }
-            });
-            if (this.destroyed) {
-                return;
+                yield massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
+                    localLibs.set(path, data);
+                });
+                if (this.destroyed) {
+                    return;
+                }
+                yield massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
+                    localLibs.set(path, data);
+                    const pack = JSON.parse(data);
+                    if (localDeps.indexOf(pack.name) !== -1) {
+                        localScripts.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
+                    }
+                });
+                if (this.destroyed) {
+                    return;
+                }
             }
             const sandboxConfig = {
-                text: initialCode,
-                compilerOptions: {},
+                text: opts.initialCode || "",
+                compilerOptions: opts.compilerOptions || {},
                 domEle,
-                libIgnore: localDeps
+                libIgnore: opts.local ? opts.local.localDeps : []
             };
             const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
             for (const [s, data] of localLibs) {

@@ -1,3 +1,4 @@
+declare type CompilerOptions = import("monaco-editor").languages.typescript.CompilerOptions;
 import { directory, massFetch } from "./traverse"
 
 type Monaco = typeof import("monaco-editor");
@@ -7,6 +8,12 @@ type ShowcaseInitialization = { editor: Monaco, sandbox: SandboxLib };
 
 declare global {
     interface Window { require: any, [key: string]: any }
+}
+
+export interface ShowcaseOptions {
+    compilerOptions?: CompilerOptions
+    local?: { localDeps: string[], libDir: string }
+    initialCode?: string
 }
 
 export class Showcase {
@@ -46,10 +53,7 @@ export class Showcase {
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined {
         return this.sandbox?.editor;
     }
-    private async initialize(domEle: HTMLElement, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
-        if (libDir === "/") {
-            libDir = "";
-        }
+    private async initialize(domEle: HTMLElement, opts: ShowcaseOptions) {
         const localScripts = new Map<string, string>();
         const localLibs = new Map<string, string>();
 
@@ -57,32 +61,35 @@ export class Showcase {
         if (this.destroyed) {
             return;
         }
-        const files = await directory(`${libDir}/directory.json`);
-        if (this.destroyed) {
-            return;
-        }
-        await massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
-            localLibs.set(path, data);
-        });
-        if (this.destroyed) {
-            return;
-        }
-        await massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
-            localLibs.set(path, data);
-            const pack = JSON.parse(data);
-            if (localDeps.indexOf(pack.name) !== -1) {
-                localScripts.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
+        if (opts.local) {
+            const { libDir, localDeps } = opts.local;
+            const files = await directory(`${libDir}/directory.json`);
+            if (this.destroyed) {
+                return;
             }
-        });
-        if (this.destroyed) {
-            return;
+            await massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
+                localLibs.set(path, data);
+            });
+            if (this.destroyed) {
+                return;
+            }
+            await massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
+                localLibs.set(path, data);
+                const pack = JSON.parse(data);
+                if (localDeps.indexOf(pack.name) !== -1) {
+                    localScripts.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
+                }
+            });
+            if (this.destroyed) {
+                return;
+            }
         }
 
         const sandboxConfig = {
-            text: initialCode,
-            compilerOptions: {},
+            text: opts.initialCode || "",
+            compilerOptions: opts.compilerOptions || {},
             domEle,
-            libIgnore: localDeps
+            libIgnore: opts.local ? opts.local.localDeps : []
         }
         const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
         for (const [s, data] of localLibs) {
@@ -92,10 +99,10 @@ export class Showcase {
         this.sandbox = sandbox;
         this.localScripts = localScripts;
     }
-    constructor(domEle: HTMLElement, localDeps: string[] = [], libDir: string = ".", initialCode: string = "") {
+    constructor(domEle: HTMLElement, opts: ShowcaseOptions = {}) {
         this.destroyed = false;
         this.localScripts = new Map();
-        this.initialize(domEle, localDeps, libDir, initialCode);
+        this.initialize(domEle, opts);
     }
 }
 
