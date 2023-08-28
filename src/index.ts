@@ -29,8 +29,8 @@ export class Showcase {
             });
             if (code) {
                 for (const [name, path] of this.localScripts) {
-                    code = code.replace(new RegExp(` from "${name}"\n`, 'g'), ` from "${path}"\n`);
-                    code = code.replace(new RegExp(` from '${name}'\n`, 'g'), ` from '${path}'\n`);
+                    code = code.replace(new RegExp(` from "${name}";`, 'g'), ` from "${path}";`);
+                    code = code.replace(new RegExp(` from '${name}';`, 'g'), ` from '${path}';`);
                 }
                 return executeJS(code, target);
             }
