@@ -1,17 +1,14 @@
 declare type CompilerOptions = import("monaco-editor").languages.typescript.CompilerOptions;
+import { createTypeScriptSandbox } from "./sandbox/index";
 declare type Monaco = typeof import("monaco-editor");
-declare type SandboxLib = typeof import("./sandbox");
-declare type ShowcaseInitialization = {
-    editor: Monaco;
-    sandbox: SandboxLib;
-};
 declare global {
     interface Window {
         require: any;
-        [key: string]: any;
+        ts: typeof import("typescript") | undefined;
     }
 }
 export interface ShowcaseOptions {
+    /**options for the Typescript compiler */
     compilerOptions?: CompilerOptions;
     local?: {
         localDeps: string[];
@@ -20,17 +17,23 @@ export interface ShowcaseOptions {
     initialCode?: string;
 }
 export declare class Showcase {
-    sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]> | undefined;
+    sandbox: ReturnType<typeof createTypeScriptSandbox> | undefined;
     localScripts: Map<string, string>;
     destroyed: boolean;
     scriptDoc: Document | undefined;
-    run(): Promise<void>;
-    target(doc: Document): void;
+    run(target: Document): Promise<void>;
     destroy(): void;
     focus(): void;
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined;
     private initialize;
     constructor(domEle: HTMLElement, opts?: ShowcaseOptions);
 }
-export declare function init(sandboxPath: string): Promise<ShowcaseInitialization>;
+export declare function init(arg: {
+    editor: Monaco;
+    ts: typeof import("typescript");
+}): void;
+export declare function fetchModulesFromCDN(): Promise<{
+    editor: Monaco;
+    ts: typeof import("typescript");
+}>;
 export {};

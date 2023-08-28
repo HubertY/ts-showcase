@@ -23,9 +23,11 @@
     },
     "homepage": "https://github.com/HubertY/ts-showcase#readme",
     "dependencies": {
-        "monaco-editor": "^0.33.0"
+        "lz-string": "^1.5.0"
     },
     "devDependencies": {
-        "typescript": "^4.7.4"
+        "@types/node": "^20.5.7",
+        "typescript": "^4.7.4",
+        "monaco-editor": "^0.33.0"
     }
 }

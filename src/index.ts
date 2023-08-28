@@ -1,42 +1,40 @@
 declare type CompilerOptions = import("monaco-editor").languages.typescript.CompilerOptions;
+import { SandboxConfig, createTypeScriptSandbox } from "./sandbox/index";
 import { directory, massFetch } from "./traverse"
 
 type Monaco = typeof import("monaco-editor");
-type SandboxLib = typeof import("./sandbox");
 
-type ShowcaseInitialization = { editor: Monaco, sandbox: SandboxLib };
+type ShowcaseInitialization = { editor: Monaco, ts: typeof import("typescript") };
 
 declare global {
-    interface Window { require: any, [key: string]: any }
+    interface Window { require: any, ts: typeof import("typescript") | undefined }
 }
 
 export interface ShowcaseOptions {
+    /**options for the Typescript compiler */
     compilerOptions?: CompilerOptions
     local?: { localDeps: string[], libDir: string }
     initialCode?: string
 }
 
 export class Showcase {
-    sandbox: ReturnType<SandboxLib["createTypeScriptSandbox"]> | undefined;
+    sandbox: ReturnType<typeof createTypeScriptSandbox> | undefined;
     localScripts: Map<string, string>;
     destroyed: boolean;
     scriptDoc: Document | undefined;
-    async run() {
+    async run(target: Document) {
         if (this.sandbox) {
             let code = await this.sandbox.getRunnableJS().catch((err) => {
                 console.log(err);
             });
             if (code) {
                 for (const [name, path] of this.localScripts) {
-                    code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
-                    code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
+                    code = code.replace(new RegExp(` from "${name}"\n`, 'g'), ` from "${path}"\n`);
+                    code = code.replace(new RegExp(` from '${name}'\n`, 'g'), ` from '${path}'\n`);
                 }
-                return executeJS(code, this.scriptDoc);
+                return executeJS(code, target);
             }
         }
-    }
-    target(doc: Document) {
-        this.scriptDoc = doc;
     }
     destroy() {
         if (this.sandbox) {
@@ -88,10 +86,10 @@ export class Showcase {
         const sandboxConfig = {
             text: opts.initialCode || "",
             compilerOptions: opts.compilerOptions || {},
-            domEle,
+            elementToAppend: domEle,
             libIgnore: opts.local ? opts.local.localDeps : []
         }
-        const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
+        const sandbox = createTypeScriptSandbox(sandboxConfig, inits.editor, inits.ts);
         for (const [s, data] of localLibs) {
             console.log(`adding /node_modules/${s}`)
             sandbox.addLibraryToRuntime(data, `/node_modules/${s}`);
@@ -128,44 +126,49 @@ function makeResolvable<T>() {
 
 const initialization = makeResolvable<ShowcaseInitialization>();
 
-export async function init(sandboxPath: string) {
-    console.log("initializing showcase...");
-    // First set up the VSCode loader in a script tag
-    const getLoaderScript = document.createElement("script")
-    getLoaderScript.src = "https://www.typescriptlang.org/js/vs.loader.js"
-    getLoaderScript.async = true
-    getLoaderScript.onload = () => {
-        // Now the loader is ready, tell require where it can get the version of monaco, and the sandbox
-        // This version uses the latest version of the sandbox, which is used on the TypeScript website
-
-        // For the monaco version you can use unpkg or the TypeScript web infra CDN
-        // You can see the available releases for TypeScript here:
-        // https://typescript.azureedge.net/indexes/releases.json
-        //
-        window.require.config({
-            paths: {
-                vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
-                sandbox: sandboxPath,
-            },
-            // This is something you need for monaco to work
-            ignoreDuplicateModules: ["vs/editor/editor.main"],
-        })
-
-        // Grab a copy of monaco, TypeScript and the sandbox
-        window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker", "sandbox/index"], (
-            editor: Monaco,
-            _tsWorker: any,
-            sandbox: SandboxLib
-        ) => {
-            if (editor && _tsWorker && sandbox) {
-                console.log("showcase initialized");
-                initialization.resolve({ editor, sandbox: sandbox });
-            }
-            else {
-                throw new ErrorEvent(`showcase init failure: editor: ${!!editor}, _tsworker: ${!!_tsWorker}, sandbox: ${!!sandbox}`);
-            }
-        })
+export function init(arg: { editor: Monaco, ts: typeof import("typescript") }) {
+    if (arg.editor && arg.ts) {
+        initialization.resolve(arg);
     }
-    document.body.appendChild(getLoaderScript)
-    return initialization;
+}
+
+export function fetchModulesFromCDN(): Promise<{ editor: Monaco, ts: typeof import("typescript") }> {
+    return new Promise((resolve, reject) => {
+        console.log("fetching monaco and typescript");
+        // First set up the VSCode loader in a script tag
+        const getLoaderScript = document.createElement("script")
+        getLoaderScript.src = "https://www.typescriptlang.org/js/vs.loader.js"
+        getLoaderScript.async = true
+        getLoaderScript.onload = () => {
+            // Now the loader is ready, tell require where it can get the version of monaco, and the sandbox
+            // This version uses the latest version of the sandbox, which is used on the TypeScript website
+
+            // For the monaco version you can use unpkg or the TypeScript web infra CDN
+            // You can see the available releases for TypeScript here:
+            // https://typescript.azureedge.net/indexes/releases.json
+            //
+            window.require.config({
+                paths: {
+                    vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
+                },
+                // This is something you need for monaco to work
+                ignoreDuplicateModules: ["vs/editor/editor.main"],
+            })
+
+            // Grab a copy of monaco and TypeScript
+            window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker"], (
+                editor: Monaco,
+                _tsWorker: any
+            ) => {
+                if (editor && _tsWorker && window.ts) {
+                    console.log("monaco and typescript succesfully fetched");
+                    resolve({ editor, ts: window.ts });
+                }
+                else {
+                    reject(`module fetch failure: editor: ${!!editor}, _tsworker: ${!!_tsWorker}`);
+                }
+            })
+        }
+        document.body.appendChild(getLoaderScript)
+    });
 }

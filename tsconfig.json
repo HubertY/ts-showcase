@@ -5,7 +5,12 @@
 		"outDir": "dist/",
 		"declaration": true,
 		"moduleResolution": "node",
-		"strict": true
+		"strict": true,
+		"allowSyntheticDefaultImports": true,
+		"lib": [
+			"ESNext",
+			"DOM"
+		]
 	},
 	"include": [
 		"src/**/*",

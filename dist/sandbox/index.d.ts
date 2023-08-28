@@ -1,3 +1,6 @@
+import { TypeScriptWorker } from "./tsWorker";
+import lzstring from "lz-string";
+import * as tsvfs from "./vendor/vfs";
 declare type CompilerOptions = import("monaco-editor").languages.typescript.CompilerOptions;
 declare type Monaco = typeof import("monaco-editor");
 /**
@@ -32,6 +35,7 @@ export declare type SandboxConfig = {
         groupCollapsed: (...args: any[]) => void;
         groupEnd: (...args: any[]) => void;
     };
+    libIgnore: string[];
 } & ({
     domID: string;
 } | {
@@ -44,7 +48,7 @@ export declare function defaultPlaygroundSettings(): {
     /** @deprecated */
     useJavaScript?: boolean | undefined;
     /** The default file for the playground  */
-    filetype: "js" | "ts" | "d.ts";
+    filetype: "ts" | "js" | "d.ts";
     /** Compiler options which are automatically just forwarded on */
     compilerOptions: import("monaco-editor").languages.typescript.CompilerOptions;
     /** Optional monaco settings overrides */
@@ -66,11 +70,16 @@ export declare function defaultPlaygroundSettings(): {
         groupCollapsed: (...args: any[]) => void;
         groupEnd: (...args: any[]) => void;
     };
+    libIgnore: string[];
 } & {
     domID: string;
 };
 /** Creates a sandbox editor, and returns a set of useful functions and the editor */
-export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxConfig>, monaco: Monaco, ts: typeof import("typescript")) => {
+export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxConfig> & ({
+    domID: string;
+} | {
+    elementToAppend: HTMLElement;
+}), monaco: Monaco, ts: typeof import("typescript")) => {
     /** The same config you passed in */
     config: {
         text: string;
@@ -89,10 +98,71 @@ export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxCon
             groupCollapsed: (...args: any[]) => void;
             groupEnd: (...args: any[]) => void;
         };
+        libIgnore: string[];
+        domID: string;
+    } | {
+        text: string;
+        useJavaScript?: boolean | undefined;
+        filetype: "js" | "ts" | "d.ts";
+        compilerOptions: CompilerOptions;
+        monacoSettings?: import("monaco-editor").editor.IEditorOptions | undefined;
+        acquireTypes: boolean;
+        supportTwoslashCompilerOptions: boolean;
+        suppressAutomaticallyGettingDefaultText?: true | undefined;
+        suppressAutomaticallyGettingCompilerFlags?: true | undefined;
+        customTypeScriptWorkerPath?: string | undefined;
+        logger: {
+            log: (...args: any[]) => void;
+            error: (...args: any[]) => void;
+            groupCollapsed: (...args: any[]) => void;
+            groupEnd: (...args: any[]) => void;
+        };
+        libIgnore: string[];
+        domID: string;
+        elementToAppend: HTMLElement;
+    } | {
+        text: string;
+        useJavaScript?: boolean | undefined;
+        filetype: "js" | "ts" | "d.ts";
+        compilerOptions: CompilerOptions;
+        monacoSettings?: import("monaco-editor").editor.IEditorOptions | undefined;
+        acquireTypes: boolean;
+        supportTwoslashCompilerOptions: boolean;
+        suppressAutomaticallyGettingDefaultText?: true | undefined;
+        suppressAutomaticallyGettingCompilerFlags?: true | undefined;
+        customTypeScriptWorkerPath?: string | undefined;
+        logger: {
+            log: (...args: any[]) => void;
+            error: (...args: any[]) => void;
+            groupCollapsed: (...args: any[]) => void;
+            groupEnd: (...args: any[]) => void;
+        };
+        libIgnore: string[];
+        elementToAppend?: HTMLElement | undefined;
+        domID: string;
+    } | {
+        text: string;
+        useJavaScript?: boolean | undefined;
+        filetype: "js" | "ts" | "d.ts";
+        compilerOptions: CompilerOptions;
+        monacoSettings?: import("monaco-editor").editor.IEditorOptions | undefined;
+        acquireTypes: boolean;
+        supportTwoslashCompilerOptions: boolean;
+        suppressAutomaticallyGettingDefaultText?: true | undefined;
+        suppressAutomaticallyGettingCompilerFlags?: true | undefined;
+        customTypeScriptWorkerPath?: string | undefined;
+        logger: {
+            log: (...args: any[]) => void;
+            error: (...args: any[]) => void;
+            groupCollapsed: (...args: any[]) => void;
+            groupEnd: (...args: any[]) => void;
+        };
+        libIgnore: string[];
+        elementToAppend: HTMLElement;
         domID: string;
     };
     /** A list of TypeScript versions you can use with the TypeScript sandbox */
-    supportedVersions: readonly ["4.8.0-beta", "4.7.4", "4.6.4", "4.5.5", "4.4.4", "4.3.5", "4.2.3", "4.1.5", "4.0.5", "3.9.7", "3.8.3", "3.7.5", "3.6.3", "3.5.1", "3.3.3", "3.1.6", "3.0.1", "2.8.1", "2.7.2", "2.4.1"];
+    supportedVersions: readonly ["5.2.0-beta", "5.1.6", "5.0.4", "4.9.5", "4.8.4", "4.7.4", "4.6.4", "4.5.5", "4.4.4", "4.3.5", "4.2.3", "4.1.5", "4.0.5", "3.9.7", "3.8.3", "3.7.5", "3.6.3", "3.5.1", "3.3.3", "3.1.6", "3.0.1", "2.8.1", "2.7.2", "2.4.1"];
     /** The monaco editor instance */
     editor: import("monaco-editor").editor.IStandaloneCodeEditor;
     /** Either "typescript" or "javascript" depending on your config */
@@ -100,9 +170,9 @@ export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxCon
     /** The outer monaco module, the result of require("monaco-editor")  */
     monaco: typeof import("monaco-editor");
     /** Gets a monaco-typescript worker, this will give you access to a language server. Note: prefer this for language server work because it happens on a webworker . */
-    //getWorkerProcess: () => Promise<TypeScriptWorker>;
+    getWorkerProcess: () => Promise<TypeScriptWorker>;
     /** A copy of require("@typescript/vfs") this can be used to quickly set up an in-memory compiler runs for ASTs, or to get complex language server results (anything above has to be serialized when passed)*/
-    //tsvfs: typeof tsvfs;
+    tsvfs: typeof tsvfs;
     /** Get all the different emitted files after TypeScript is run */
     getEmitResult: () => Promise<import("typescript").EmitOutput>;
     /** Gets just the JavaScript for your sandbox, will transpile if in TS only */
@@ -239,7 +309,7 @@ export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxCon
     /** A way to get callbacks when compiler settings have changed */
     setDidUpdateCompilerSettings: (func: (opts: CompilerOptions) => void) => void;
     /** A copy of lzstring, which is used to archive/unarchive code */
-    //lzstring: typeof lzstring;
+    lzstring: typeof lzstring;
     /** Returns compiler options found in the params of the current page */
     createURLQueryWithCompilerOptions: (_sandbox: any, paramOverrides?: any) => string;
     /**
@@ -258,4 +328,4 @@ export declare const createTypeScriptSandbox: (partialConfig: Partial<SandboxCon
     addLibraryToRuntime: (code: string, _path: string) => void;
 };
 export declare type Sandbox = ReturnType<typeof createTypeScriptSandbox>;
-export { };
+export {};

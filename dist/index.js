@@ -7,6 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+import { createTypeScriptSandbox } from "./sandbox/index";
 import { directory, massFetch } from "./traverse";
 export class Showcase {
     constructor(domEle, opts = {}) {
@@ -14,7 +15,7 @@ export class Showcase {
         this.localScripts = new Map();
         this.initialize(domEle, opts);
     }
-    run() {
+    run(target) {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.sandbox) {
                 let code = yield this.sandbox.getRunnableJS().catch((err) => {
@@ -22,16 +23,13 @@ export class Showcase {
                 });
                 if (code) {
                     for (const [name, path] of this.localScripts) {
-                        code = code.replace(new RegExp(`"${name}"`, 'g'), `"${path}"`);
-                        code = code.replace(new RegExp(`'${name}'`, 'g'), `'${path}'`);
+                        code = code.replace(new RegExp(` from "${name}"\n`, 'g'), ` from "${path}"\n`);
+                        code = code.replace(new RegExp(` from '${name}'\n`, 'g'), ` from '${path}'\n`);
                     }
-                    return executeJS(code, this.scriptDoc);
+                    return executeJS(code, target);
                 }
             }
         });
-    }
-    target(doc) {
-        this.scriptDoc = doc;
     }
     destroy() {
         if (this.sandbox) {
@@ -83,10 +81,10 @@ export class Showcase {
             const sandboxConfig = {
                 text: opts.initialCode || "",
                 compilerOptions: opts.compilerOptions || {},
-                domEle,
+                elementToAppend: domEle,
                 libIgnore: opts.local ? opts.local.localDeps : []
             };
-            const sandbox = inits.sandbox.createTypeScriptSandbox(sandboxConfig, inits.editor, window.ts);
+            const sandbox = createTypeScriptSandbox(sandboxConfig, inits.editor, inits.ts);
             for (const [s, data] of localLibs) {
                 console.log(`adding /node_modules/${s}`);
                 sandbox.addLibraryToRuntime(data, `/node_modules/${s}`);
@@ -112,9 +110,14 @@ function makeResolvable() {
     return ret;
 }
 const initialization = makeResolvable();
-export function init(sandboxPath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        console.log("initializing showcase...");
+export function init(arg) {
+    if (arg.editor && arg.ts) {
+        initialization.resolve(arg);
+    }
+}
+export function fetchModulesFromCDN() {
+    return new Promise((resolve, reject) => {
+        console.log("fetching monaco and typescript");
         // First set up the VSCode loader in a script tag
         const getLoaderScript = document.createElement("script");
         getLoaderScript.src = "https://www.typescriptlang.org/js/vs.loader.js";
@@ -129,23 +132,21 @@ export function init(sandboxPath) {
             window.require.config({
                 paths: {
                     vs: "https://typescript.azureedge.net/cdn/4.7.3/monaco/min/vs",
-                    sandbox: sandboxPath,
                 },
                 // This is something you need for monaco to work
                 ignoreDuplicateModules: ["vs/editor/editor.main"],
             });
-            // Grab a copy of monaco, TypeScript and the sandbox
-            window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker", "sandbox/index"], (editor, _tsWorker, sandbox) => {
-                if (editor && _tsWorker && sandbox) {
-                    console.log("showcase initialized");
-                    initialization.resolve({ editor, sandbox: sandbox });
+            // Grab a copy of monaco and TypeScript
+            window.require(["vs/editor/editor.main", "vs/language/typescript/tsWorker"], (editor, _tsWorker) => {
+                if (editor && _tsWorker && window.ts) {
+                    console.log("monaco and typescript succesfully fetched");
+                    resolve({ editor, ts: window.ts });
                 }
                 else {
-                    throw new ErrorEvent(`showcase init failure: editor: ${!!editor}, _tsworker: ${!!_tsWorker}, sandbox: ${!!sandbox}`);
+                    reject(`module fetch failure: editor: ${!!editor}, _tsworker: ${!!_tsWorker}`);
                 }
             });
         };
         document.body.appendChild(getLoaderScript);
-        return initialization;
     });
 }
