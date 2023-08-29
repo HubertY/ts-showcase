@@ -16,15 +16,17 @@ export interface ShowcaseOptions {
     };
     initialCode?: string;
 }
+export declare function clearLocalCache(...args: string[]): void;
 export declare class Showcase {
     sandbox: ReturnType<typeof createTypeScriptSandbox> | undefined;
-    localScripts: Map<string, string>;
+    replaceJSPaths: Map<string, string>;
     destroyed: boolean;
     scriptDoc: Document | undefined;
     run(target: Document): Promise<void>;
     destroy(): void;
     focus(): void;
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined;
+    private localFetch;
     private initialize;
     constructor(domEle: HTMLElement, opts?: ShowcaseOptions);
 }

@@ -17,9 +17,21 @@ export interface ShowcaseOptions {
     initialCode?: string
 }
 
+let LOCAL_CACHE: Record<string, { files: Map<string, string>, jspaths: Map<string, string> } | undefined> = {};
+export function clearLocalCache(...args: string[]) {
+    if (args.length === 0) {
+        LOCAL_CACHE = {};
+    }
+    else {
+        for (const arg of args) {
+            delete LOCAL_CACHE[arg];
+        }
+    }
+}
+
 export class Showcase {
     sandbox: ReturnType<typeof createTypeScriptSandbox> | undefined;
-    localScripts: Map<string, string>;
+    replaceJSPaths: Map<string, string>;
     destroyed: boolean;
     scriptDoc: Document | undefined;
     async run(target: Document) {
@@ -28,7 +40,7 @@ export class Showcase {
                 console.log(err);
             });
             if (code) {
-                for (const [name, path] of this.localScripts) {
+                for (const [name, path] of this.replaceJSPaths) {
                     code = code.replace(new RegExp(` from "${name}";`, 'g'), ` from "${path}";`);
                     code = code.replace(new RegExp(` from '${name}';`, 'g'), ` from '${path}';`);
                 }
@@ -51,55 +63,63 @@ export class Showcase {
     get editor(): import("monaco-editor").editor.IStandaloneCodeEditor | undefined {
         return this.sandbox?.editor;
     }
-    private async initialize(domEle: HTMLElement, opts: ShowcaseOptions) {
-        const localScripts = new Map<string, string>();
-        const localLibs = new Map<string, string>();
-
-        const inits = await initialization;
-        if (this.destroyed) {
-            return;
-        }
-        if (opts.local) {
-            const { libDir, localDeps } = opts.local;
-            const files = await directory(`${libDir}/directory.json`);
-            if (this.destroyed) {
-                return;
-            }
-            await massFetch(libDir, files.filter((s) => s.endsWith(".d.ts")), (path, data) => {
-                localLibs.set(path, data);
+    private async localFetch(libDir: string) {
+        const x = LOCAL_CACHE[libDir];
+        if (!x) {
+            const local = { files: new Map<string, string>(), jspaths: new Map<string, string>() };
+            const dirFiles = await directory(`${libDir}/directory.json`);
+            await massFetch(libDir, dirFiles.filter((s) => s.endsWith(".d.ts")), (path, data) => {
+                local.files.set(path, data);
             });
-            if (this.destroyed) {
-                return;
-            }
-            await massFetch(libDir, files.filter((s) => s.endsWith("package.json")), (path, data) => {
-                localLibs.set(path, data);
+            await massFetch(libDir, dirFiles.filter((s) => s.endsWith("package.json")), (path, data) => {
+                local.files.set(path, data);
                 const pack = JSON.parse(data);
-                if (localDeps.indexOf(pack.name) !== -1) {
-                    localScripts.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
+                if (pack.name && pack.main) {
+                    local.jspaths.set(pack.name, `${libDir}/${path.replace("package.json", pack.main)}`);
                 }
             });
-            if (this.destroyed) {
-                return;
-            }
+            LOCAL_CACHE[libDir] = local;
+            return local;
         }
-
+        else {
+            return x;
+        }
+    }
+    private async initialize(domEle: HTMLElement, opts: ShowcaseOptions) {
+        const inits = await initialization;
+        if (this.destroyed) {
+            return false;
+        }
+        const local = opts.local ? await this.localFetch(opts.local.libDir) : null;
+        if (this.destroyed) {
+            return false;
+        }
         const sandboxConfig = {
             text: opts.initialCode || "",
             compilerOptions: opts.compilerOptions || {},
             elementToAppend: domEle,
-            libIgnore: opts.local ? opts.local.localDeps : []
+            libIgnore: opts.local?.localDeps || []
         }
         const sandbox = createTypeScriptSandbox(sandboxConfig, inits.editor, inits.ts);
-        for (const [s, data] of localLibs) {
-            console.log(`adding /node_modules/${s}`)
-            sandbox.addLibraryToRuntime(data, `/node_modules/${s}`);
+        if (local && opts.local) {
+            for (const [k, v] of local.files) {
+                console.log(`adding /node_modules/${k}`)
+                sandbox.addLibraryToRuntime(v, `/node_modules/${k}`);
+            }
+
+            for (const k of opts.local.localDeps) {
+                const v = local.jspaths.get(k);
+                if (v) {
+                    this.replaceJSPaths.set(k, v);
+                }
+            }
         }
         this.sandbox = sandbox;
-        this.localScripts = localScripts;
+        return true;
     }
     constructor(domEle: HTMLElement, opts: ShowcaseOptions = {}) {
         this.destroyed = false;
-        this.localScripts = new Map();
+        this.replaceJSPaths = new Map();
         this.initialize(domEle, opts);
     }
 }
